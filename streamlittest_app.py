@@ -1,0 +1,120 @@
+import os
+import streamlit as st
+import google.generativeai as genai
+from dotenv import load_dotenv
+
+# Load environment variables from a .env file
+load_dotenv()
+
+# Configure the Streamlit page
+st.set_page_config(
+    page_title="Healthcare Chat",
+    page_icon="🤖",
+    layout="wide"
+)
+
+# --- Sidebar for Configuration ---
+with st.sidebar:
+    st.title("Configuration")
+    st.caption("Provide your API key and tweak generation parameters.")
+
+    # Get Gemini API key
+    api_key = st.text_input(
+        "GEMINI_API_KEY",
+        type="password",
+        value=os.getenv("GEMINI_API_KEY")
+    )
+
+    # Model selection
+    model_name = st.selectbox("Model", ["gemini-1.5-flash"])
+
+    # System instruction for the chatbot
+    system_instruction = st.text_area(
+        "System Instruction",
+        value="You are a concise, helpful assistant that helps the user get answers on Healthcare related topics only.",
+        height=100
+    )
+
+    st.subheader("Generation Parameters")
+    temperature = st.slider("Temperature", 0.0, 1.0, 0.7, 0.1)
+    top_p = st.slider("Top-p", 0.0, 1.0, 0.9, 0.05)
+    top_k = st.slider("Top-k", 1, 100, 40, 1)
+    max_tokens = st.slider("Max output tokens", 32, 2048, 512, 32)
+
+    st.info("Tip: Store your API key in a `.env` file locally or as a secret in your deployment environment.")
+
+
+# --- Helper Functions ---
+@st.cache_resource(show_spinner="Connecting to the model...")
+def get_model(api_key, model_name, system_instruction):
+    """Create and cache a GenerativeAI Model handle."""
+    if not api_key:
+        st.error("API_KEY is missing. Please provide a valid GEMINI_API_KEY.")
+        st.stop()
+    try:
+        genai.configure(api_key=api_key)
+        model = genai.GenerativeModel(model_name, system_instruction=system_instruction)
+        return model
+    except Exception as e:
+        st.error(f"Failed to configure or create the model: {e}")
+        st.stop()
+
+
+def initialize_chat():
+    """Initialize session state for chat messages and the chat object."""
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    if "chat" not in st.session_state:
+        model = get_model(api_key, model_name, system_instruction)
+        st.session_state.chat = model.start_chat(history=[])
+
+# --- Main Layout ---
+st.title("🤖 Healthcare Chat")
+st.caption("A compact app demonstrating chat history, side-bar controls, caching, and streaming.")
+
+# Initialize chat state
+initialize_chat()
+
+# Render existing messages
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
+
+# Chat input from the user
+user_prompt = st.chat_input("Ask something about healthcare...", key="chat_input")
+
+if user_prompt:
+    # Add user message to session state and display it
+    st.session_state.messages.append({"role": "user", "content": user_prompt})
+    with st.chat_message("user"):
+        st.markdown(user_prompt)
+
+    # Prepare generation configuration
+    gen_config = {
+        "temperature": temperature,
+        "top_p": top_p,
+        "top_k": top_k,
+        "max_output_tokens": max_tokens,
+    }
+
+    # Generate and stream the response
+    with st.chat_message("assistant"):
+        message_placeholder = st.empty()
+        full_response = ""
+        try:
+            # Use the chat object from session state to send the message
+            responses = st.session_state.chat.send_message(
+                user_prompt,
+                generation_config=gen_config,
+                stream=True
+            )
+            for response in responses:
+                full_response += response.text
+                message_placeholder.markdown(full_response + "▌")
+            message_placeholder.markdown(full_response)
+        except Exception as e:
+            st.error(f"An error occurred: {e}")
+            full_response = "Sorry, I encountered an error."
+
+    # Add the final assistant response to session state
+    st.session_state.messages.append({"role": "assistant", "content": full_response})
