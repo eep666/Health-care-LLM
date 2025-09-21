@@ -58,7 +58,8 @@ with st.sidebar:
         image = Image.open(uploaded_file).convert("RGB")
     else:
         image = get_placeholder_image()
-    st.image(image, caption="Current image", use_column_width=True)
+    # UPDATED LINE: Replaced use_column_width with use_container_width
+    st.image(image, caption="Current image", use_container_width=True)
 
 
 # --- Helper Function for Model ---
