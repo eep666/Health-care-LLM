@@ -38,7 +38,7 @@ with st.sidebar:
         st.stop()
 
     # Note: 'gemini-1.5-flash' is the correct name for the latest flash model.
-    model_name = st.selectbox("Model", ["gemini-1.5-flash"])
+    model_name = st.selectbox("Model", ["gemini-1.5-pro", "gemini-1.5-flash"])
     system_instruction = st.text_area(
         "System Instruction",
         value="You are a concise, helpful assistant that helps the user get answers on Healthcare related topics only.",
@@ -126,3 +126,4 @@ if user_prompt:
             full_response = "Sorry, I encountered an error."
 
     st.session_state.messages.append({"role": "assistant", "content": full_response})
+
