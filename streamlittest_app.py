@@ -2,26 +2,33 @@ import os
 import streamlit as st
 import google.generativeai as genai
 from dotenv import load_dotenv
+from PIL import Image
 
 # Load environment variables from a .env file for local development
 load_dotenv()
 
 # --- Page Configuration ---
 st.set_page_config(
-    page_title="Healthcare Chat",
+    page_title="Healthcare LLM",
     page_icon="🤖",
     layout="wide"
 )
 
 # --- Securely Get API Key ---
-# This function gets the key from Streamlit secrets when deployed,
-# or from a .env file locally. It's not displayed to the user.
+# This gets the key from Streamlit secrets when deployed, or from a .env file locally.
 def get_api_key():
     return os.getenv("GEMINI_API_KEY")
 
 api_key = get_api_key()
 
-# --- Sidebar for Generation Parameters ---
+# --- Helper Function for Placeholder Image ---
+@st.cache_resource(show_spinner=False)
+def get_placeholder_image():
+    """Create and cache a simple placeholder image."""
+    return Image.new("RGB", (200, 100), color=(240, 240, 240))
+
+
+# --- Sidebar Configuration ---
 with st.sidebar:
     st.title("Configuration")
     st.caption("Tweak the generation parameters for the model.")
@@ -30,6 +37,7 @@ with st.sidebar:
         st.error("GEMINI_API_KEY is not set. Please add it to your secrets.")
         st.stop()
 
+    # Note: 'gemini-1.5-flash' is the correct name for the latest flash model.
     model_name = st.selectbox("Model", ["gemini-1.5-flash"])
     system_instruction = st.text_area(
         "System Instruction",
@@ -42,6 +50,15 @@ with st.sidebar:
     top_p = st.slider("Top-p", 0.0, 1.0, 0.9, 0.05)
     top_k = st.slider("Top-k", 1, 100, 40, 1)
     max_tokens = st.slider("Max output tokens", 32, 2048, 512, 32)
+
+    st.write("---")
+    st.subheader("Image Uploader")
+    uploaded_file = st.file_uploader("Upload an image (optional)", type=["png", "jpg", "jpeg"])
+    if uploaded_file:
+        image = Image.open(uploaded_file).convert("RGB")
+    else:
+        image = get_placeholder_image()
+    st.image(image, caption="Current image", use_column_width=True)
 
 
 # --- Helper Function for Model ---
@@ -56,8 +73,8 @@ def get_model(_api_key, model_name, system_instruction):
         st.error(f"Failed to configure or create the model: {e}")
         st.stop()
 
-# --- Chat Logic ---
-st.title("🤖 Healthcare Chat")
+# --- Main Chat Logic ---
+st.title("🤖 Healthcare LLM")
 st.caption("Ask me anything about general healthcare topics.")
 
 # Initialize chat
@@ -92,6 +109,8 @@ if user_prompt:
         message_placeholder = st.empty()
         full_response = ""
         try:
+            # Note: Image data is not yet being sent to the model in this example.
+            # This would require modifying the send_message call to include the image.
             responses = st.session_state.chat.send_message(
                 user_prompt,
                 generation_config=gen_config,
